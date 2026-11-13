@@ -1,5 +1,31 @@
 # SIIM-ISIC Melanoma Classification: CNN + LIME
 
+## Objective
+
+- **Problem** → melanoma is the deadliest skin cancer but is curable when caught early; dermatologists see far more harmless moles than melanomas (1 in 57 images here), and waiting lists are long
+- **Why this repo** → rank skin-lesion photos by P(malignant) with a fine-tuned CNN, judge it with ROC-AUC instead of the misleading 98 % accuracy, and check with LIME that it looks at the lesion, not at hair, rulers or the camera
+- **Real-world use** → triage in teledermatology: suspicious photos reach the dermatologist first, low-risk ones wait; the LIME map shows *where* the model looked
+
+## Highlights
+
+**Question:** why is accuracy useless here?
+
+**Answer:** only 584 of 33,126 images (1.76 %) are malignant. A model that always says "benign" is 98 % accurate and finds no melanoma → the model is judged by ROC-AUC, and the threshold is chosen on validation.
+
+**Question:** who is most at risk?
+
+**Answer:** age matters most: the malignant share rises from about 1 % under 50 to about 9 % at 80+. Small groups get wide Wilson intervals, so the notebook shows the uncertainty next to every rate.
+
+| Group | Malignant share |
+|---|---|
+| All images | 1.76 % |
+| Under 50 | ~1 % |
+| 80 and older | ~9 % |
+
+**Question:** can the model cheat by recognising the patient?
+
+**Answer:** yes, if the same patient is on both sides of the split (2,056 patients, median 12 photos each): skin tone, camera and lighting give the patient away. The split is grouped by patient, and the notebook stops if a patient appears twice.
+
 ## [1/9] Overview
 
 - **Data** → [SIIM-ISIC Melanoma Classification](https://www.kaggle.com/competitions/siim-isic-melanoma-classification)
@@ -97,6 +123,10 @@
 - **[1/2] Head** → backbone frozen, Adam `1e-3`, up to `EPOCHS_HEAD`
 - **[2/2] Fine-tune** → last `FINE_TUNE_LAST_N` backbone layers unfrozen, Adam `1e-5`, up to `EPOCHS_FINE_TUNE`
 - **Best weights** → early stopping on validation AUC per phase; the head weights are restored if fine-tuning didn't beat them (kept in memory, no checkpoint file)
+
+![EfficientNetB0 architecture](assets/melanoma_efficientnet_architecture.png)
+
+Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
 
 ## [8/9] Evaluation and LIME
 
