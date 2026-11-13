@@ -5,7 +5,7 @@
 - **Data** → [SIIM-ISIC Melanoma Classification](https://www.kaggle.com/competitions/siim-isic-melanoma-classification)
 - **Task** → dermoscopic image → benign (0) / malignant (1)
 - **Metric** → ROC-AUC
-- **Notebook** → `01_melanoma_classification_cnn_lime.ipynb`
+- **Notebook** → `melanoma_classification_cnn_lime.ipynb`
 - **Backup** → `arch/` (original version)
 
 ## [2/9] Run on Kaggle
