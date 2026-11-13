@@ -5,7 +5,7 @@
 - **Data** → [SIIM-ISIC Melanoma Classification](https://www.kaggle.com/competitions/siim-isic-melanoma-classification)
 - **Task** → dermoscopic image → benign (0) / malignant (1)
 - **Metric** → ROC-AUC
-- **Notebook** → `dl-binaryclassification-siim-isic-melanoma-cnn-lime.ipynb`
+- **Notebook** → `01_melanoma_classification_cnn_lime.ipynb`
 - **Backup** → `arch/` (original version)
 
 ## [2/9] Run on Kaggle
@@ -17,7 +17,8 @@
   - `WRITE_CACHE = False` → images are not cached to `.npz`
   - `SAVE_MODEL = False` → model file is not written
   - `SAVE_SUBMISSION = False` → predicts `SUBMISSION_PREVIEW` test images, writes nothing
-- **Lighter run** → lower `IMG_SIZE`, `N_BENIGN`, epochs or `LIME_SAMPLES`
+- **Lighter run** → lower `IMG_SIZE`, `N_BENIGN` (e.g. 1000), epochs or `LIME_SAMPLES`
+- **More data** → raise `N_BENIGN` (e.g. 8000); memory grows ~150 KB per image at 224 px
 
 ## [3/9] Metadata EDA
 
@@ -35,10 +36,12 @@
 
 ## [4/9] Sampling and split
 
-- **Sampling** → all malignant images + `N_BENIGN` random benign images → lighter, less imbalanced
-  - evaluation on this sample is ~37% malignant vs 1.76% in real data
+- **Sampling** → all 584 malignant images + `N_BENIGN` = 5,000 random benign images → 5,584 images
+  - 6× lighter than the full set, 3.5× more images than a 1,000-benign sample
+  - evaluation on this sample is ~10.5% malignant vs 1.76% in real data
 - **Split** → `StratifiedGroupKFold`: each patient in exactly one split, similar class ratio
   - test ≈ 1/7 of patients → validation ≈ 1/6 of the rest → ~70 / 15 / 15
+  - train 3,986 (416 malignant) · validation 797 (83) · test 801 (85)
   - the notebook stops with an assertion if a patient appears in two splits
 
 ## [5/9] Images
@@ -69,6 +72,8 @@
 
      ![inpaint](assets/hair_removal_3_inpaint.png)
 - **Augmentation** → over-sample malignant images in the training split only → no augmented copies of val/test images leak into training
+  - `AUG_PER_MALIGNANT` = 2 copies per image → 416 + 832 = 1,248 malignant vs 3,570 benign
+  - capped → thousands of copies of 416 lesions would teach the same lesions over and over
   - each new image = one training image + one random method
   - **`transform_image`** → rotate ±10°, zoom ×1.1; `BORDER_REPLICATE` fills corners with edge pixels
   - **`random_fscb`** → random flip, saturation, contrast, brightness
@@ -88,6 +93,7 @@
   - **Online augmentation** → random flip / rotation / zoom inside the model (training only)
   - **Frozen BatchNorm** → backbone called with `training=False`, also when fine-tuning
   - **Mixed precision** on GPU → float16 compute, float32 output → faster, less memory
+- **Class weights** → `n / (2 · n_class)` → benign ≈ 0.67, malignant ≈ 1.93 → closes the remaining gap in the loss
 - **[1/2] Head** → backbone frozen, Adam `1e-3`, up to `EPOCHS_HEAD`
 - **[2/2] Fine-tune** → last `FINE_TUNE_LAST_N` backbone layers unfrozen, Adam `1e-5`, up to `EPOCHS_FINE_TUNE`
 - **Best weights** → early stopping on validation AUC per phase; the head weights are restored if fine-tuning didn't beat them (kept in memory, no checkpoint file)
@@ -96,7 +102,7 @@
 
 - **Threshold** → chosen on validation (max Youden's J = TPR − FPR), applied unchanged to test
 - **ROC-AUC** → independent of the class ratio → comparable to real data
-- **Precision** → depends on the class ratio: test is ~37% malignant vs 1.76% in reality → real-world precision is much lower
+- **Precision** → depends on the class ratio: test is ~10.6% malignant vs 1.76% in reality → real-world precision is much lower
 - **Charts** → ROC, precision-recall, predicted-probability histogram, confusion matrix
 - **LIME** → hide random superpixels → fit a linear model to the CNN's outputs → one weight per superpixel
   - green → towards malignant, red → towards benign
@@ -105,7 +111,7 @@
 
 ## [9/9] Next steps
 
-- **More data** → more of the 32,542 benign images (with class weights), external malignant images (e.g. ISIC 2019)
+- **All the data** → all 32,542 benign images from a pre-resized (256×256) copy of the JPEGs → fast loading; external malignant images (e.g. ISIC 2019)
 - **Metadata** → combine age / sex / site with image features (rates differ by group)
 - **Shortcut check** → predictions shouldn't follow image resolution / acquisition source
 - **Bigger run** → higher resolution, k-fold ensemble, test-time augmentation
