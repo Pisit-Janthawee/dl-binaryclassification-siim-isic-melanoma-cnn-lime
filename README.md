@@ -26,7 +26,7 @@
 
 **Answer:** yes, if the same patient is on both sides of the split (2,056 patients, median 12 photos each): skin tone, camera and lighting give the patient away. The split is grouped by patient, and the notebook stops if a patient appears twice.
 
-## [1/9] Overview
+## [1/10] Overview
 
 - **Data** → [SIIM-ISIC Melanoma Classification](https://www.kaggle.com/competitions/siim-isic-melanoma-classification)
 - **Task** → dermoscopic image → benign (0) / malignant (1)
@@ -34,19 +34,21 @@
 - **Notebook** → `melanoma_classification_cnn_lime.ipynb`
 - **Backup** → `arch/` (original version)
 
-## [2/9] Run on Kaggle
+## [2/10] Run on Kaggle
 
 - **Accelerator** → GPU
 - **Internet** → On (ImageNet weights, `pip install lime`)
 - **Settings** → top cell of the notebook, documented in its note
 - **Safety** → every write is off by default; the notebook only previews
   - `WRITE_CACHE = False` → images are not cached to `.npz`
-  - `SAVE_MODEL = False` → model file is not written
+  - `SAVE_MODEL = False` → model file and `settings.json` are not written
+  - `LAUNCH_APP = False` → the Gradio app is not started
   - `SAVE_SUBMISSION = False` → predicts `SUBMISSION_PREVIEW` test images, writes nothing
 - **Lighter run** → lower `IMG_SIZE`, `N_BENIGN` (e.g. 1000), epochs or `LIME_SAMPLES`
+- **App on Kaggle** → `LAUNCH_APP = True` prints a temporary public Gradio link
 - **More data** → raise `N_BENIGN` (e.g. 8000); memory grows ~150 KB per image at 224 px
 
-## [3/9] Metadata EDA
+## [3/10] Metadata EDA
 
 - **Scope** → full train set (33,126 images), not the modeling sample → real rates
 - **Class imbalance** → 584 malignant (1.76%)
@@ -60,7 +62,7 @@
   - same patient in train and test → model recognises the patient (skin tone, camera, lighting) → inflated scores
   - → our split is grouped by patient
 
-## [4/9] Sampling and split
+## [4/10] Sampling and split
 
 - **Sampling** → all 584 malignant images + `N_BENIGN` = 5,000 random benign images → 5,584 images
   - 6× lighter than the full set, 3.5× more images than a 1,000-benign sample
@@ -70,7 +72,7 @@
   - train 3,986 (416 malignant) · validation 797 (83) · test 801 (85)
   - the notebook stops with an assertion if a patient appears in two splits
 
-## [5/9] Images
+## [5/10] Images
 
 - **Loading**
   - **Draft mode** → JPEGs decoded at 1/2, 1/4 or 1/8 scale (originals up to ~6000×4000 px)
@@ -83,7 +85,7 @@
   - each class normalised separately → class sizes don't matter
   - differences = colour cues for the CNN, or camera differences (see resolution table)
 
-## [6/9] Hair removal and augmentation
+## [6/10] Hair removal and augmentation
 
 - **Hair removal** → hair covers parts of the lesion and can mislead the CNN
   1. **Grayscale** → RGB → gray
@@ -112,7 +114,7 @@
   - [OpenCV geometric transformations](https://docs.opencv.org/4.x/da/d54/group__imgproc__transform.html)
   - [tf.image](https://www.tensorflow.org/api_docs/python/tf/image)
 
-## [7/9] Modeling
+## [7/10] Modeling
 
 - **Model** → EfficientNetB0 pre-trained on ImageNet + new sigmoid head
   - **Input 0-255** → Keras' EfficientNet rescales internally
@@ -128,7 +130,7 @@
 
 Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
 
-## [8/9] Evaluation and LIME
+## [8/10] Evaluation and LIME
 
 - **Threshold** → chosen on validation (max Youden's J = TPR − FPR), applied unchanged to test
 - **ROC-AUC** → independent of the class ratio → comparable to real data
@@ -152,7 +154,28 @@ Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
   - one test image per confusion-matrix cell
   - trustworthy → focuses on the lesion; suspicious → hair, rulers, ink marks, dark corners
 
-## [9/9] Next steps
+## [9/10] Gradio app
+
+- **What it does** → upload a skin-lesion photo → P(malignant), a triage decision ("see a dermatologist soon" / "routine skin check") and a LIME map
+- **Same preparation as training** → RGB, resized to `IMG_SIZE` × `IMG_SIZE`, values 0-255
+- **Decision** → P(malignant) ≥ the threshold picked on validation (max TPR − FPR), read from `models/settings.json`
+- **On Kaggle** → `LAUNCH_APP = True` in the top cell
+- **On your computer**
+  1. run the notebook on Kaggle with `SAVE_MODEL = True`
+  2. download `melanoma_effnetb0.keras` and `settings.json` from `/kaggle/working` into `models/`
+  3. `pip install -r requirements.txt` → `python app.py`
+- **Example images** → `MEL_DATA_DIR=<competition folder> python app.py` adds the first training photos as examples
+- A triage aid that sorts photos for a doctor, not a diagnosis
+
+| File | What it is |
+|---|---|
+| `melanoma_classification_cnn_lime.ipynb` | the whole project, Kaggle-ready |
+| `app.py`, `requirements.txt` | Gradio triage app |
+| `models/` | trained model + threshold (after you run the notebook) |
+| `assets/` | figures and the editable draw.io diagram |
+| `arch/` | first version of this project |
+
+## [10/10] Next steps
 
 - **All the data** → all 32,542 benign images from a pre-resized (256×256) copy of the JPEGs → fast loading; external malignant images (e.g. ISIC 2019)
 - **Metadata** → combine age / sex / site with image features (rates differ by group)
