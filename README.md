@@ -134,7 +134,20 @@ Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
 - **ROC-AUC** → independent of the class ratio → comparable to real data
 - **Precision** → depends on the class ratio: test is ~10.6% malignant vs 1.76% in reality → real-world precision is much lower
 - **Charts** → ROC, precision-recall, predicted-probability histogram, confusion matrix
-- **LIME** → hide random superpixels → fit a linear model to the CNN's outputs → one weight per superpixel
+- **LIME** → switch off random parts of the image, watch how P(malignant) changes, mark the parts whose removal changes it most
+  1. **Superpixels** → ~50 patches of similar colour (quickshift); whole patches go on or off
+
+     ![superpixels](assets/lime_1_superpixels.png)
+  2. **Perturbation** → 300 copies, about half of the superpixels switched off (black) in each
+  3. **Ask the CNN** → P(malignant) for every copy: hiding the lesion drops it, hiding plain skin barely moves it
+
+     ![perturbation](assets/lime_2_perturbation.png)
+  4. **Weigh the copies** → copies close to the original count more
+  5. **Fit a linear model** → $P \approx w_0 + \sum_k w_k z_k$, $z_k$ = patch $k$ visible → $w_k$ = change in P when patch $k$ is on
+  6. **Show** → largest weights in green (towards malignant), negative in red
+
+     ![weights](assets/lime_3_weights.png)
+  - pictures use a toy scorer (P rises with how much lesion is visible); the notebook repeats the steps with the real CNN
   - green → towards malignant, red → towards benign
   - one test image per confusion-matrix cell
   - trustworthy → focuses on the lesion; suspicious → hair, rulers, ink marks, dark corners
