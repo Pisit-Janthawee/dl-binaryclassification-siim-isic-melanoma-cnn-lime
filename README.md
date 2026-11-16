@@ -134,20 +134,20 @@ Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
 - **ROC-AUC** → independent of the class ratio → comparable to real data
 - **Precision** → depends on the class ratio: test is ~10.6% malignant vs 1.76% in reality → real-world precision is much lower
 - **Charts** → ROC, precision-recall, predicted-probability histogram, confusion matrix
-- **LIME** → switch off random parts of the image, watch how P(malignant) changes, mark the parts whose removal changes it most
-  1. **Superpixels** → ~50 patches of similar colour (quickshift); whole patches go on or off
+- **LIME** → hides parts of the image and checks how much the CNN's answer changes → the parts that change it most are the parts the CNN looks at
+  1. **Cut into pieces (superpixels)** → about 50 small pieces of similar colour
 
      ![superpixels](assets/lime_1_superpixels.png)
-  2. **Perturbation** → 300 copies, about half of the superpixels switched off (black) in each
-  3. **Ask the CNN** → P(malignant) for every copy: hiding the lesion drops it, hiding plain skin barely moves it
+  2. **Altered copies (perturbation)** → 300 copies, about half of the pieces painted black in each
+  3. **Ask the CNN** → P(malignant) for every copy: lesion hidden → P goes down, only skin hidden → P stays
 
      ![perturbation](assets/lime_2_perturbation.png)
-  4. **Weigh the copies** → copies close to the original count more
-  5. **Fit a linear model** → $P \approx w_0 + \sum_k w_k z_k$, $z_k$ = patch $k$ visible → $w_k$ = change in P when patch $k$ is on
-  6. **Show** → largest weights in green (towards malignant), negative in red
+  4. **Trust similar copies more** → copies that look almost like the original count more
+  5. **Find the important pieces** → straight-line formula $P \approx w_0 + \sum_k w_k z_k$ → $w_k$ = how much P goes up when piece $k$ is shown
+  6. **Show** → green = towards malignant, red = towards benign
 
      ![weights](assets/lime_3_weights.png)
-  - pictures use a toy scorer (P rises with how much lesion is visible); the notebook repeats the steps with the real CNN
+  - the pictures use a toy model (P goes up when more lesion can be seen); the notebook does the same steps with the real CNN
   - green → towards malignant, red → towards benign
   - one test image per confusion-matrix cell
   - trustworthy → focuses on the lesion; suspicious → hair, rulers, ink marks, dark corners
