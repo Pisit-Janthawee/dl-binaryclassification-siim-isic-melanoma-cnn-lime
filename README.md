@@ -57,6 +57,7 @@
   - leakage → never a model input
 - **Malignancy rate by site / sex / age** → bar = share of malignant images, dashed line = overall rate
   - error bar = 95% Wilson confidence interval → small groups have wide intervals → may be noise
+  - Wilson, part by part → the $z^2/2n$ term pulls the centre towards 50%, so a rare rate gets a lopsided range (oral/genital: 4 of 124 = 3.2%, range 1.3-8.0%); the plain $\hat p \pm 1.96\,\text{SE}$ would give 0.1-6.3%, and "0-0%" for a group without melanoma
   - rate rises with age: ~1% under 50 → ~9% at 80+
 - **Patient structure** → 2,056 patients, median 12 images each, 0% of test patients in train
   - same patient in train and test → model recognises the patient (skin tone, camera, lighting) → inflated scores
@@ -122,6 +123,10 @@
   - **Frozen BatchNorm** → backbone called with `training=False`, also when fine-tuning
   - **Mixed precision** on GPU → float16 compute, float32 output → faster, less memory
 - **Class weights** → `n / (2 · n_class)` → benign ≈ 0.67, malignant ≈ 1.93 → closes the remaining gap in the loss
+- **Sigmoid, part by part** → $p = 1/(1+e^{-z})$ with $z = b + \sum_j w_j h_j$ over the 1,280 pooled features → $z$ is the log-odds; the squashing never changes the order, so ROC-AUC ignores it; $p$ runs higher than the real-life chance (trained on 26% melanoma + weights) → used as a ranking score, threshold picked on validation
+- **Weighted binary cross-entropy, part by part** → $L = -w_y[y\log p + (1-y)\log(1-p)]$ → $y$ switches one term on; the log has no ceiling (says 1% for a melanoma → 4.61); $w_y$ is what matters at 1.8%: without it a lazy model saying "1.8%" for every image gets an average loss of only 0.089 and flags nothing, with it the best lazy guess is 50% (loss 0.693)
+
+  ![lazy model and class weights](assets/m_bce_weights.png)
 - **[1/2] Head** → backbone frozen, Adam `1e-3`, up to `EPOCHS_HEAD`
 - **[2/2] Fine-tune** → last `FINE_TUNE_LAST_N` backbone layers unfrozen, Adam `1e-5`, up to `EPOCHS_FINE_TUNE`
 - **Best weights** → early stopping on validation AUC per phase; the head weights are restored if fine-tuning didn't beat them (kept in memory, no checkpoint file)
@@ -133,7 +138,8 @@ Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
 ## [8/10] Evaluation and LIME
 
 - **Threshold** → chosen on validation (max Youden's J = TPR − FPR), applied unchanged to test
-- **ROC-AUC** → independent of the class ratio → comparable to real data
+  - the minus weighs one point of melanomas caught the same as one point of false alarms; a clinic may move the line lower on purpose, since a missed melanoma hurts more
+- **ROC-AUC** → $P(p_\text{malignant} > p_\text{benign})$ → only the order of the scores counts → independent of the class ratio and of the class weights → comparable to real data
 - **Precision** → depends on the class ratio: test is ~10.6% malignant vs 1.76% in reality → real-world precision is much lower
 - **Charts** → ROC, precision-recall, predicted-probability histogram, confusion matrix
 - **LIME** → hides parts of the image and checks how much the CNN's answer changes → the parts that change it most are the parts the CNN looks at
@@ -144,8 +150,10 @@ Editable source: `assets/melanoma_efficientnet_architecture.drawio`.
   3. **Ask the CNN** → P(malignant) for every copy: lesion hidden → P goes down, only skin hidden → P stays
 
      ![perturbation](assets/lime_2_perturbation.png)
-  4. **Trust similar copies more** → copies that look almost like the original count more
-  5. **Find the important pieces** → straight-line formula $P \approx w_0 + \sum_k w_k z_k$ → $w_k$ = how much P goes up when piece $k$ is shown
+  4. **Trust similar copies more** → copies that look almost like the original count more: proximity kernel $\pi_x = \exp(-D^2/2\sigma^2)$, $D = 1 - \sqrt{m/K}$ for $m$ of $K$ pieces shown, $\sigma = 0.25$ (LIME default)
+
+     ![proximity weight](assets/m_lime_kernel.png)
+  5. **Find the important pieces** → straight-line formula $P \approx w_0 + \sum_k w_k z_k$ → $w_k$ = how much P goes up when piece $k$ is shown → a local surrogate fitted by weighted least squares, $\sum_z \pi_x(z)\,(f(z) - g(z))^2$ + a small Ridge penalty: it only has to match the CNN near this one image, and it can miss pieces that only matter together
   6. **Show** → green = towards malignant, red = towards benign
 
      ![weights](assets/lime_3_weights.png)
